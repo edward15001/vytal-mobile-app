@@ -92,3 +92,25 @@ export function getTodaySummary(): Promise<FoodDaySummary> {
 export async function deleteFood(id: string): Promise<FoodDaySummary> {
   return api<any>(`/api/foodlog/${id}`, { method: 'DELETE' });
 }
+
+/**
+ * Marca (o desmarca) una comida del plan como registrada en el diario de hoy.
+ * Usa `source: 'plan'` para distinguirla de las comidas registradas por foto,
+ * así desmarcar aquí nunca borra un registro real de la cámara.
+ * Devuelve el resumen del día actualizado: es la misma fuente de datos que
+ * usan "Hoy" y "Comer", así que marcar en una se refleja en la otra.
+ */
+export async function togglePlannedMeal(
+  entries: FoodEntry[],
+  mealType: string,
+  meal: { nombre: string; calorias: number }
+): Promise<FoodDaySummary> {
+  const existing = entries.find(e => e.meal_type === mealType && e.source === 'plan');
+  if (existing) return deleteFood(existing.id);
+  return logFood({
+    name: meal.nombre,
+    calories: Number(meal.calorias) || 0,
+    meal_type: mealType,
+    source: 'plan',
+  });
+}

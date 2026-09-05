@@ -2,7 +2,7 @@ import { API_URL } from './config';
 import { getToken } from './token';
 
 /**
- * Cliente HTTP de la API de NutroVia.
+ * Cliente HTTP de la API de Vytal.
  * Añade el header Authorization con el JWT cuando hay token.
  */
 const API_TIMEOUT_MS = 15000;
@@ -33,7 +33,7 @@ export async function api<T = any>(
     if (err?.name === 'AbortError') {
       throw new Error(`La conexión está tardando demasiado (${path}). Comprueba tu internet e inténtalo de nuevo.`);
     }
-    throw new Error(`No se pudo conectar con NutroVia (${path}). Comprueba tu conexión e inténtalo de nuevo.`);
+    throw new Error(`No se pudo conectar con Vytal (${path}). Comprueba tu conexión e inténtalo de nuevo.`);
   } finally {
     clearTimeout(timeout);
   }

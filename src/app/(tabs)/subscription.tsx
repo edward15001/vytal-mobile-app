@@ -115,12 +115,9 @@ export default function SubscriptionScreen() {
   const pro = ACTIVE_STATUSES.includes(sub?.status || 'none');
 
   const rows: { icon: IconName; label: string; onPress?: () => void; right?: React.ReactNode }[] = [
-    { icon: 'document-text-outline', label: 'Actualizar mis valores', onPress: () => router.push('/questionnaire?edit=1') },
+    { icon: 'clipboard', label: 'Actualizar mis valores', onPress: () => router.push('/questionnaire?edit=1') },
     { icon: 'trending-up', label: 'Mi progreso' },
   ];
-  if (pro) {
-    rows.push({ icon: 'card', label: 'Método de pago', right: <Text style={styles.rowMeta}>•••• 4291</Text> });
-  }
   if (payments.length > 0) {
     rows.push({ icon: 'receipt', label: 'Facturas', onPress: () => setShowInvoices(v => !v) });
   }

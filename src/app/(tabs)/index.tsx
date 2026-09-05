@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -14,8 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getPlan, isPro, NutritionPlan } from '@/lib/plan';
-import { getUser } from '@/lib/auth';
-import { getTodaySummary, FoodDaySummary } from '@/lib/foodlog';
+import { getUser, logout } from '@/lib/auth';
+import { getTodaySummary, togglePlannedMeal, FoodDaySummary } from '@/lib/foodlog';
 import { getCheckinStatus, respondCheckin, CheckinStatus } from '@/lib/checkin';
 import { Spacing } from '@/constants/theme';
 import { Border, Font, NV, Radius } from '@/constants/nutrovia';
@@ -28,10 +29,13 @@ const MONTH_FULL = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ];
 
-// Las tres comidas principales del día, tal y como las pide el resumen de "Hoy".
-const TODAY_MEALS: { key: 'desayuno' | 'comida' | 'cena'; label: string }[] = [
+// Todas las comidas del día, en el mismo orden y con las mismas etiquetas
+// que usa "Comer" — así el checklist de "Hoy" cubre el menú completo.
+const TODAY_MEALS: { key: 'desayuno' | 'almuerzo' | 'comida' | 'merienda' | 'cena'; label: string }[] = [
   { key: 'desayuno', label: 'Desayuno' },
+  { key: 'almuerzo', label: 'Media mañana' },
   { key: 'comida', label: 'Comida' },
+  { key: 'merienda', label: 'Merienda' },
   { key: 'cena', label: 'Cena' },
 ];
 
@@ -79,6 +83,12 @@ export default function OverviewScreen() {
           .then(s => setCheckin(s.due ? s : null))
           .catch(() => {});
       }
+    } catch (err: any) {
+      // Sesión caducada en el servidor: cerramos sesión para volver al login
+      // en vez de dejar la pantalla de Hoy atascada con un error sin capturar.
+      if (err?.status === 401) {
+        await logout();
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -95,6 +105,15 @@ export default function OverviewScreen() {
     }
     if (response === 'want_change') {
       router.push('/questionnaire?edit=1');
+    }
+  }
+
+  async function toggleMeal(mealKey: string, meal: { nombre: string; calorias: number }) {
+    try {
+      const updated = await togglePlannedMeal(day?.entries || [], mealKey, meal);
+      setDay(updated);
+    } catch (err: any) {
+      Alert.alert('No se pudo actualizar', err?.message || 'Inténtalo de nuevo.');
     }
   }
 
@@ -148,15 +167,15 @@ export default function OverviewScreen() {
         {/* Cabecera: marca + avatar de cuenta */}
         <View style={[styles.section, styles.header]}>
           <View style={styles.brandRow}>
-            <Image source={require('@/assets/images/logo-mark.png')} style={styles.logoMark} resizeMode="contain" />
-            <Text style={styles.brand}>NUTROVIA</Text>
+            <Image source={require('@/assets/images/vytal-mark.png')} style={styles.logoMark} resizeMode="contain" />
+            <Text style={styles.brand}>VYTAL</Text>
           </View>
           <View style={styles.headerActions}>
             <Pressable
               style={({ pressed }) => pressed && styles.pressed}
               onPress={() => router.push('/questionnaire?edit=1')}
               hitSlop={8}>
-              <Icon name="document-text-outline" size={16} />
+              <Icon name="clipboard" size={16} />
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
@@ -227,14 +246,17 @@ export default function OverviewScreen() {
                 if (!meal) return null;
                 const done = loggedMeals.has(m.key);
                 return (
-                  <View key={m.key} style={[styles.planRow, i > 0 && styles.planRowDivider]}>
+                  <Pressable
+                    key={m.key}
+                    style={({ pressed }) => [styles.planRow, i > 0 && styles.planRowDivider, pressed && styles.pressed]}
+                    onPress={() => toggleMeal(m.key, meal)}>
                     <Icon name={done ? 'checkmark-circle' : 'circle-outline'} size={22} color={done ? NV.savia : NV.neutro500} />
                     <View style={styles.planRowInfo}>
                       <Text style={styles.planRowTitle}>{m.label}</Text>
                       <Text style={styles.planRowDesc} numberOfLines={1}>{meal.nombre}</Text>
                     </View>
                     <Text style={styles.planRowKcal}>{meal.calorias}</Text>
-                  </View>
+                  </Pressable>
                 );
               })}
 
@@ -249,8 +271,9 @@ export default function OverviewScreen() {
                   <Icon name="barbell" size={20} color={NV.arcilla700} />
                   <View style={styles.planRowInfo}>
                     <Text style={styles.trainingTitle}>{todaySession.tipo}</Text>
-                    {/* "42 min" es un ejemplo: aún no hay duración real en el plan de entreno. */}
-                    <Text style={styles.trainingDesc}>{todaySession.ejercicios.length} ejercicios · 42 min</Text>
+                    <Text style={styles.trainingDesc}>
+                      {todaySession.ejercicios.length} ejercicio{todaySession.ejercicios.length === 1 ? '' : 's'}
+                    </Text>
                   </View>
                   <Text style={styles.trainingCta}>Empezar</Text>
                 </Pressable>
@@ -331,7 +354,7 @@ const styles = StyleSheet.create({
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   logoMark: { width: 26, height: 26 },
-  // Sin fontWeight: es una tipografía de un solo peso (Keratus Bold) — fijar
+  // Sin fontWeight: es una tipografía de un solo peso (Tahoe Display) — fijar
   // un fontWeight junto al fontFamily hace que Android ignore el tipo de
   // letra personalizado y sustituya uno del sistema.
   brand: { color: NV.tinta, fontFamily: Font.brand, fontSize: 18, letterSpacing: 3 },

@@ -37,7 +37,18 @@ export type IconName =
   | 'sunny'
   | 'receipt'
   | 'log-out'
-  | 'chevron-forward';
+  | 'chevron-forward'
+  | 'play'
+  | 'pause'
+  | 'clipboard'
+  | 'desktop'
+  | 'walk'
+  | 'scale'
+  | 'heart'
+  | 'egg'
+  | 'pulse'
+  | 'check'
+  | 'chart';
 
 const MAP: Record<IconName, Name> = {
   home: 'home-outline',
@@ -72,10 +83,21 @@ const MAP: Record<IconName, Name> = {
   receipt: 'receipt-outline',
   'log-out': 'log-out-outline',
   'chevron-forward': 'chevron-forward',
+  play: 'play',
+  pause: 'pause',
+  clipboard: 'clipboard-outline',
+  desktop: 'desktop-outline',
+  walk: 'walk-outline',
+  scale: 'scale-outline',
+  heart: 'heart-outline',
+  egg: 'egg-outline',
+  pulse: 'pulse-outline',
+  check: 'checkmark',
+  chart: 'stats-chart-outline',
 };
 
 /**
- * Ícono del set de NutroVia (Ionicons outline, multiplataforma).
+ * Ícono del set de Vytal (Ionicons outline, multiplataforma).
  *
  * Por defecto va en tinta: un icono acompaña a una etiqueta, no la sustituye
  * ni pide atención. En savia solo cuando marca un estado conseguido; en el

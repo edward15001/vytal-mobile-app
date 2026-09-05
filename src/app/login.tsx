@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -55,9 +56,11 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.logo}>
-            NUTROVIA<Text style={styles.logoDot}>.</Text>
-          </Text>
+          <Image
+            source={require('@/assets/images/vytal-logo-black.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.subtitle}>
             {mode === 'login' ? 'Bienvenido de nuevo' : 'Crea tu cuenta para empezar'}
           </Text>
@@ -139,14 +142,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.five,
   },
   logo: {
-    color: NV.tinta,
-    fontFamily: Font.brand,
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: 5,
-  },
-  logoDot: {
-    color: NV.savia,
+    width: 220,
+    height: 220 / 4.641,
   },
   subtitle: {
     color: NV.textoSuave,

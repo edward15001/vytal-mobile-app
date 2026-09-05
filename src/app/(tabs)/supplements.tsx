@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getPlan, isPro, NutritionPlan } from '@/lib/plan';
+import { getPlan, isPro, NutritionPlan, Supplement } from '@/lib/plan';
 import { Border, Font, NV, Radius } from '@/constants/nutrovia';
 import { Spacing } from '@/constants/theme';
 import { Icon, IconName } from '@/components/icon';
@@ -17,9 +17,23 @@ function iconFor(nombre: string): IconName {
   return 'medkit';
 }
 
-// Prioridad y momento de toma: ejemplo hasta que el plan traiga estos campos reales.
-const PRIORITY_EXAMPLE = ['Prioridad alta', 'Prioridad alta', 'Opcional'];
-const MOMENT_EXAMPLE = ['Post-entreno', 'Con comida', 'Indiferente'];
+// El plan no trae prioridad ni momento de toma como campos propios, pero
+// motivo/dosis ya los describen en texto libre: se derivan de ahí en vez de
+// mostrar valores fijos sin relación con el suplemento real.
+function priorityFor(s: Supplement): string {
+  const text = `${s.motivo} ${s.dosis}`.toLowerCase();
+  if (/\bsolo si\b|opcional|no es necesari|no imprescindible/.test(text)) return 'Opcional';
+  return 'Prioridad alta';
+}
+
+function momentFor(s: Supplement): string {
+  const text = `${s.dosis} ${s.motivo}`.toLowerCase();
+  if (/post.?entreno|despu[eé]s (del|de) entren|tras entrenar/.test(text)) return 'Post-entreno';
+  if (/con (la |las )?comida|con las comidas|en el desayuno|en la comida|en la cena/.test(text)) return 'Con comida';
+  if (/por la mañana|en ayunas|al despertar/.test(text)) return 'Por la mañana';
+  if (/antes de dormir|por la noche/.test(text)) return 'Antes de dormir';
+  return 'Indiferente';
+}
 
 export default function SupplementsScreen() {
   const [plan, setPlan] = useState<NutritionPlan | null>(null);
@@ -83,7 +97,7 @@ export default function SupplementsScreen() {
                 <View style={styles.item}>
                   <View style={styles.itemLabelRow}>
                     <Icon name={iconFor(s.nombre)} size={18} color={NV.malva} />
-                    <Text style={styles.itemPriority}>{PRIORITY_EXAMPLE[i % 3]}</Text>
+                    <Text style={styles.itemPriority}>{priorityFor(s)}</Text>
                   </View>
                   <Text style={styles.itemName}>{s.nombre}</Text>
                   <Text style={styles.itemMotivo}>{s.motivo}</Text>
@@ -95,7 +109,7 @@ export default function SupplementsScreen() {
                     </View>
                     <View style={[styles.itemStat, styles.itemStatEnd]}>
                       <Text style={styles.itemStatLabel}>Momento</Text>
-                      <Text style={styles.itemStatValue}>{MOMENT_EXAMPLE[i % 3]}</Text>
+                      <Text style={styles.itemStatValue}>{momentFor(s)}</Text>
                     </View>
                   </View>
                 </View>

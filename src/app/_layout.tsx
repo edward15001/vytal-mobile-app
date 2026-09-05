@@ -18,11 +18,11 @@ import { NV } from '@/constants/nutrovia';
 SplashScreen.preventAutoHideAsync();
 
 /**
- * NutroVia tiene un solo tema: papel cálido. Se fija el tema de navegación a
+ * Vytal tiene un solo tema: papel cálido. Se fija el tema de navegación a
  * mano en lugar de seguir al sistema, para que el fondo entre pantallas no
  * parpadee en negro cuando el dispositivo está en modo oscuro.
  */
-const NutroviaNavTheme = {
+const VytalNavTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -41,7 +41,7 @@ export default function RootLayout() {
     Archivo_600SemiBold,
     Archivo_800ExtraBold,
     Newsreader_300Light_Italic,
-    Keratus: require('@/assets/fonts/keratus-bold.ttf'),
+    TahoeDisplay: require('@/assets/fonts/tahoe-display.ttf'),
   });
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function RootLayout() {
   if (loggedIn === null || !fontsLoaded) return <SplashScreenView />;
 
   return (
-    <ThemeProvider value={NutroviaNavTheme}>
+    <ThemeProvider value={VytalNavTheme}>
       <StatusBar style="dark" backgroundColor={NV.papel} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: NV.papel } }}>
         <Stack.Protected guard={loggedIn}>

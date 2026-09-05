@@ -1,5 +1,5 @@
 /**
- * NutroVia — identidad visual v1.0
+ * Vytal — identidad visual v1.0
  *
  * Fuente única de verdad del color, la geometría y la tipografía de la app.
  * Los mismos valores que usa la web (public/css/styles.css, sección 19) y que
@@ -89,17 +89,17 @@ export const Border = {
  * `src/app/_layout.tsx` (ver CLAUDE_CODE.md, paso 4). Hasta que se carguen,
  * `Archivo`/`Newsreader` caen a la del sistema sin romper nada.
  *
- *  · Archivo   → toda la interfaz. 400 / 600 / 800.
- *  · Newsreader→ solo titulares de marca y citas, Light 300 en itálica,
- *                nunca por debajo de 22px ni en interfaz funcional.
- *  · Keratus   → solo el logotipo.
+ *  · Archivo     → toda la interfaz. 400 / 600 / 800.
+ *  · Newsreader  → solo titulares de marca y citas, Light 300 en itálica,
+ *                  nunca por debajo de 22px ni en interfaz funcional.
+ *  · Tahoe Display → solo el logotipo ("VYTAL").
  */
 export const Font = {
   regular: 'Archivo_400Regular',
   medium: 'Archivo_600SemiBold',
   bold: 'Archivo_800ExtraBold',
   serif: 'Newsreader_300Light_Italic',
-  brand: 'Keratus',
+  brand: 'TahoeDisplay',
 } as const;
 
 /**

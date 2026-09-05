@@ -12,7 +12,7 @@ interface Props {
 
 /**
  * Fallback web: Stripe PaymentSheet es un módulo nativo, no está disponible
- * en el navegador. Aquí redirigimos al flujo web de NutroVia.
+ * en el navegador. Aquí redirigimos al flujo web de Vytal.
  */
 export default function ProPaymentWeb({ onClose }: Props) {
   return (
@@ -26,7 +26,7 @@ export default function ProPaymentWeb({ onClose }: Props) {
           WebBrowser.openBrowserAsync('https://nutrovia.vercel.app');
           onClose();
         }}>
-        <Text style={styles.btnText}>Abrir la web de NutroVia</Text>
+        <Text style={styles.btnText}>Abrir la web de Vytal</Text>
       </Pressable>
     </View>
   );

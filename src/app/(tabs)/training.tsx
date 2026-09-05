@@ -1,9 +1,17 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getPlan, NutritionPlan } from '@/lib/plan';
+import {
+  ParsedExercise,
+  TrainingSessionState,
+  loadTrainingSession,
+  parseExercise,
+  restSecondsFor,
+  saveTrainingSession,
+} from '@/lib/trainingSession';
 import { Spacing } from '@/constants/theme';
 import { Border, Font, NV, Radius } from '@/constants/nutrovia';
 import { Icon } from '@/components/icon';
@@ -25,10 +33,26 @@ function isoWeek(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
+// Tras un descanso: si quedan series del mismo ejercicio, pasa a la
+// siguiente; si no, pasa al primer set del ejercicio siguiente.
+function advanceAfterRest(s: TrainingSessionState, exercises: ParsedExercise[]): TrainingSessionState {
+  const current = exercises[s.exerciseIndex];
+  if (!current) return { ...s, phase: 'set', restRemaining: 0 };
+  if (s.setIndex < current.series) {
+    return { ...s, phase: 'set', setIndex: s.setIndex + 1, restRemaining: 0 };
+  }
+  return { ...s, phase: 'set', exerciseIndex: s.exerciseIndex + 1, setIndex: 1, restRemaining: 0 };
+}
+
 export default function TrainingScreen() {
   const [plan, setPlan] = useState<NutritionPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(todayDayLabel());
+
+  // Progreso de la sesión activa: se guarda en el dispositivo y se recupera
+  // al volver a esta pantalla o reabrir la app.
+  const [session, setSession] = useState<TrainingSessionState | null>(null);
+  const [running, setRunning] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,6 +78,97 @@ export default function TrainingScreen() {
     }, [])
   );
 
+  const tp = plan?.training_plan;
+  const sessionOf = (d: string) => tp?.sesiones.find(s => s.dia?.trim().toLowerCase() === d.toLowerCase());
+  const daySession = sessionOf(selectedDay);
+  const exercises = (daySession?.ejercicios || []).map(parseExercise);
+  const totalSeries = exercises.reduce((acc, e) => acc + e.series, 0);
+
+  // Referencia siempre al día con sus ejercicios ya parseados: el intervalo
+  // del cronómetro la lee para no quedarse con datos de un día anterior.
+  const exercisesRef = useRef(exercises);
+  exercisesRef.current = exercises;
+
+  // Al cambiar de día (o de plan), recupera el progreso guardado de ese día
+  // si sigue siendo válido, o arranca en blanco. Siempre en pausa: reabrir
+  // la app o volver a la pestaña no reanuda el cronómetro solo.
+  useEffect(() => {
+    if (!plan?.generated_at) return;
+    let cancelled = false;
+    setRunning(false);
+    (async () => {
+      const saved = await loadTrainingSession(selectedDay);
+      if (cancelled) return;
+      setSession(saved && saved.planGeneratedAt === plan.generated_at ? saved : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDay, plan?.generated_at]);
+
+  // Cronómetro + cuenta atrás del descanso: un único intervalo mientras corre.
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      setSession(prev => {
+        if (!prev) return prev;
+        let next: TrainingSessionState = { ...prev, elapsed: prev.elapsed + 1 };
+        if (next.phase === 'rest') {
+          if (next.restRemaining <= 1) {
+            next = advanceAfterRest(next, exercisesRef.current);
+            if (next.exerciseIndex >= exercisesRef.current.length) setRunning(false);
+          } else {
+            next.restRemaining -= 1;
+          }
+        }
+        const structural = next.phase !== prev.phase || next.exerciseIndex !== prev.exerciseIndex || next.setIndex !== prev.setIndex;
+        if (structural || next.elapsed % 5 === 0) saveTrainingSession(next);
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  function onSessionButton() {
+    if (!session) {
+      const fresh: TrainingSessionState = {
+        day: selectedDay,
+        planGeneratedAt: plan?.generated_at || '',
+        elapsed: 0,
+        exerciseIndex: 0,
+        setIndex: 1,
+        phase: 'set',
+        restRemaining: 0,
+      };
+      setSession(fresh);
+      saveTrainingSession(fresh);
+      setRunning(true);
+      return;
+    }
+    setRunning(r => !r);
+  }
+
+  function completeSet() {
+    if (!session) return;
+    const current = exercises[session.exerciseIndex];
+    if (!current) return;
+    const isLastSetOfLastExercise = session.setIndex >= current.series && session.exerciseIndex >= exercises.length - 1;
+    const next: TrainingSessionState = isLastSetOfLastExercise
+      ? { ...session, phase: 'set', exerciseIndex: exercises.length, restRemaining: 0 }
+      : { ...session, phase: 'rest', restRemaining: restSecondsFor(current.reps) };
+    setSession(next);
+    saveTrainingSession(next);
+    if (isLastSetOfLastExercise) setRunning(false);
+  }
+
+  function skipRest() {
+    if (!session || session.phase !== 'rest') return;
+    const next = advanceAfterRest(session, exercises);
+    setSession(next);
+    saveTrainingSession(next);
+    if (next.exerciseIndex >= exercises.length) setRunning(false);
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
@@ -61,8 +176,6 @@ export default function TrainingScreen() {
       </SafeAreaView>
     );
   }
-
-  const tp = plan?.training_plan;
 
   if (!tp) {
     return (
@@ -72,9 +185,6 @@ export default function TrainingScreen() {
     );
   }
 
-  const sessionOf = (d: string) => tp.sesiones.find(s => s.dia?.trim().toLowerCase() === d.toLowerCase());
-  const session = sessionOf(selectedDay);
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -82,13 +192,12 @@ export default function TrainingScreen() {
         <View style={[styles.section, styles.headSection]}>
           <View style={styles.headLeft}>
             <Text style={styles.weekLabel}>Semana {String(isoWeek(new Date())).padStart(2, '0')}</Text>
-            <Text style={styles.sessionTitle}>{session ? session.tipo : 'Descanso'}</Text>
+            <Text style={styles.sessionTitle}>{daySession ? daySession.tipo : 'Descanso'}</Text>
           </View>
-          {session && (
+          {session && daySession && (
             <View style={styles.headRight}>
-              {/* "42 min" es un ejemplo: aún no hay duración ni nº de series real en el plan. */}
-              <Text style={styles.headDuration}>42 min</Text>
-              <Text style={styles.headSets}>22 series</Text>
+              <Text style={styles.headDuration}>{Math.floor(session.elapsed / 60)} min</Text>
+              <Text style={styles.headSets}>{totalSeries} series</Text>
             </View>
           )}
         </View>
@@ -114,20 +223,70 @@ export default function TrainingScreen() {
           })}
         </View>
 
-        {!session ? (
+        {!daySession ? (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>Día de descanso. Aprovecha para recuperar.</Text>
           </View>
         ) : (
           <>
-            {/* Ejercicios de la sesión */}
+            {/* Ejercicios de la sesión, en orden: hechos, el actual, los pendientes */}
             <View style={styles.exerciseList}>
-              {session.ejercicios.map((e, i) => (
-                <View key={i} style={[styles.exerciseRow, i > 0 && styles.exerciseRowDivider]}>
-                  <Icon name="circle-outline" size={22} color={NV.neutro500} />
-                  <Text style={styles.exerciseText}>{e}</Text>
-                </View>
-              ))}
+              {exercises.map((ex, i) => {
+                const isDone = !!session && i < session.exerciseIndex;
+                const isActive = !!session && i === session.exerciseIndex;
+
+                if (isActive && session!.phase === 'rest') {
+                  const nextLabel =
+                    session!.setIndex < ex.series
+                      ? `Antes de la serie ${session!.setIndex + 1} de ${ex.nombre}`
+                      : exercises[i + 1]
+                        ? `Antes de ${exercises[i + 1].nombre}`
+                        : 'Última serie de la sesión';
+                  return (
+                    <View key={i} style={[styles.exerciseRow, styles.restRow, i > 0 && styles.exerciseRowDivider]}>
+                      <Icon name="notifications" size={22} color={NV.ambar700} />
+                      <View style={styles.exerciseInfo}>
+                        <Text style={styles.restTitle}>Descansa {session!.restRemaining}s</Text>
+                        <Text style={styles.restHint}>{nextLabel}</Text>
+                      </View>
+                      <Pressable onPress={skipRest} hitSlop={8}>
+                        <Text style={styles.skipText}>Saltar</Text>
+                      </Pressable>
+                    </View>
+                  );
+                }
+
+                return (
+                  <Pressable
+                    key={i}
+                    disabled={!isActive}
+                    style={({ pressed }) => [
+                      styles.exerciseRow,
+                      i > 0 && styles.exerciseRowDivider,
+                      isActive && styles.exerciseRowActive,
+                      isActive && pressed && styles.pressed,
+                    ]}
+                    onPress={isActive ? completeSet : undefined}>
+                    {isDone ? (
+                      <Icon name="checkmark-circle" size={22} color={NV.savia} />
+                    ) : isActive ? (
+                      <View style={styles.activeSquare} />
+                    ) : (
+                      <Icon name="circle-outline" size={22} color={NV.neutro500} />
+                    )}
+                    <View style={styles.exerciseInfo}>
+                      <Text style={[styles.exerciseText, isDone && styles.exerciseTextDone]}>{ex.nombre}</Text>
+                      <Text style={styles.exerciseMeta}>
+                        {isActive
+                          ? `Serie ${session!.setIndex} de ${ex.series}`
+                          : ex.reps
+                            ? `${ex.series} × ${ex.reps}`
+                            : ex.raw}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
 
             {tp.progresion?.length > 0 && (
@@ -151,12 +310,17 @@ export default function TrainingScreen() {
         )}
       </ScrollView>
 
-      {/* Empezar sesión: sin implementar todavía, solo el punto de entrada visual. */}
-      {session && (
+      {/* Fijo bajo el scroll (no dentro de él): iniciar / pausar / continuar
+          la sesión, con el cronómetro siempre visible en la cabecera. */}
+      {daySession && (
         <View style={styles.startBarWrap}>
-          <Pressable style={({ pressed }) => [styles.startBar, pressed && styles.startBarPressed]} onPress={() => {}}>
-            <Text style={styles.startBarText}>Comenzar sesión</Text>
-            <Icon name="arrow-forward" size={16} color={NV.papel} />
+          <Pressable
+            style={({ pressed }) => [styles.startBar, pressed && styles.startBarPressed]}
+            onPress={onSessionButton}>
+            <Text style={styles.startBarText}>
+              {!session ? 'Comenzar sesión' : running ? 'Pausar sesión' : 'Continuar sesión'}
+            </Text>
+            <Icon name={running ? 'pause' : 'play'} size={18} color={NV.papel} />
           </Pressable>
         </View>
       )}
@@ -169,6 +333,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: NV.papel, alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
   scroll: { flex: 1 },
   content: { paddingBottom: Spacing.four },
+  pressed: { opacity: 0.85 },
 
   // Todas las secciones son de ancho completo: sin cajas, solo un filete
   // horizontal de 2px en tinta que cierra cada una por abajo.
@@ -206,7 +371,17 @@ const styles = StyleSheet.create({
   exerciseList: { borderBottomWidth: Border.structural, borderBottomColor: NV.tinta },
   exerciseRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three },
   exerciseRowDivider: { borderTopWidth: Border.inner, borderTopColor: NV.fileteSuave },
-  exerciseText: { flex: 1, color: NV.tinta, fontFamily: Font.bold, fontSize: 15, fontWeight: '700' },
+  exerciseRowActive: { backgroundColor: NV.arcilla100 },
+  exerciseInfo: { flex: 1, gap: 2 },
+  exerciseText: { color: NV.tinta, fontFamily: Font.bold, fontSize: 15, fontWeight: '700' },
+  exerciseTextDone: { color: NV.textoSuave, textDecorationLine: 'line-through' },
+  exerciseMeta: { color: NV.textoSuave, fontFamily: Font.regular, fontSize: 12 },
+  activeSquare: { width: 20, height: 20, backgroundColor: NV.arcilla },
+
+  restRow: { backgroundColor: NV.ambar100 },
+  restTitle: { color: NV.ambar700, fontFamily: Font.bold, fontSize: 15, fontWeight: '800' },
+  restHint: { color: NV.textoSuave, fontFamily: Font.regular, fontSize: 12, marginTop: 2 },
+  skipText: { color: NV.ambar700, fontFamily: Font.medium, fontSize: 13, fontWeight: '700' },
 
   notesSection: { gap: Spacing.one },
   notesLabelRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, marginBottom: 2 },
@@ -214,6 +389,7 @@ const styles = StyleSheet.create({
   note: { color: NV.textoSuave, fontFamily: Font.regular, fontSize: 13, lineHeight: 19 },
 
   startBarWrap: {
+    backgroundColor: NV.papel,
     borderTopWidth: Border.structural,
     borderTopColor: NV.tinta,
     paddingHorizontal: Spacing.four,

@@ -100,7 +100,7 @@ function PaymentSheetLauncher({
       try {
         const { error: initError } = await initPaymentSheet({
           paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: 'NutroVia',
+          merchantDisplayName: 'Vytal',
           style: 'alwaysLight',
         });
         if (initError) {

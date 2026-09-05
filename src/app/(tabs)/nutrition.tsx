@@ -57,11 +57,12 @@ function formatDateLabel(d: Date): string {
 }
 
 const WEEK_DATES = currentWeekDates();
+const TODAY_LABEL = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1] || 'Lunes';
 
 export default function NutritionScreen() {
   const [plan, setPlan] = useState<NutritionPlan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [day, setDay] = useState(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1] || 'Lunes');
+  const [day, setDay] = useState(TODAY_LABEL);
   const [menu, setMenu] = useState<Record<string, DayMenu> | null>(null);
   const [original, setOriginal] = useState<Record<string, DayMenu> | null>(null);
   const [openMeal, setOpenMeal] = useState<MealKey | null>(null);
@@ -110,6 +111,20 @@ export default function NutritionScreen() {
     : 0;
   const kcalDiff = dayKcal - origKcal;
   const daySwapped = MEALS.some(m => isMealSwapped(day, m.key));
+
+  // Reparte los macros diarios reales del plan según el peso calórico de
+  // cada comida/día: no hay desglose de macros por comida en el backend,
+  // así que se deriva de datos reales en vez de mostrar cifras inventadas.
+  function macrosFor(kcal: number): { p: number; c: number; g: number } {
+    const totalKcal = plan?.daily_calories || 0;
+    if (!totalKcal || !kcal) return { p: 0, c: 0, g: 0 };
+    const ratio = kcal / totalKcal;
+    return {
+      p: Math.round((plan?.protein_g || 0) * ratio),
+      c: Math.round((plan?.carbs_g || 0) * ratio),
+      g: Math.round((plan?.fat_g || 0) * ratio),
+    };
+  }
 
   function isMealSwapped(d: string, key: MealKey): boolean {
     if (!menu || !original) return false;
@@ -239,9 +254,8 @@ export default function NutritionScreen() {
                   </Text>
                 ) : null}
               </Text>
-              {/* Macros del día: ejemplo hasta que el plan traiga el desglose real. */}
               <Text style={styles.daySub}>
-                137 P / 216 C / 82 G · {mealCount} comida{mealCount === 1 ? '' : 's'}
+                {macrosFor(dayKcal).p} P / {macrosFor(dayKcal).c} C / {macrosFor(dayKcal).g} G · {mealCount} comida{mealCount === 1 ? '' : 's'}
               </Text>
             </View>
 
@@ -266,8 +280,9 @@ export default function NutritionScreen() {
                           {mealSwapped && <Text style={styles.changedBadge}>Modificado</Text>}
                         </View>
                         <Text style={styles.mealName} numberOfLines={2}>{meal.nombre}</Text>
-                        {/* Macros por comida: ejemplo hasta que el plan traiga el desglose real. */}
-                        <Text style={styles.mealMacros}>28 P / 62 C / 16 G</Text>
+                        <Text style={styles.mealMacros}>
+                          {macrosFor(Number(meal.calorias) || 0).p} P / {macrosFor(Number(meal.calorias) || 0).c} C / {macrosFor(Number(meal.calorias) || 0).g} G
+                        </Text>
                       </View>
                       <View style={styles.mealEnd}>
                         <Text style={styles.mealKcal}>{meal.calorias}</Text>

@@ -16,7 +16,7 @@ export default function SplashScreen() {
 
         <Animated.View entering={FadeInUp.duration(700).delay(350)}>
           <Text style={styles.logo}>
-            NUTROVIA<Text style={styles.logoDot}>.</Text>
+            VYTAL<Text style={styles.logoDot}>.</Text>
           </Text>
         </Animated.View>
 
@@ -47,8 +47,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Sin fontWeight: Keratus es un solo peso — combinarlo con fontWeight hace
-  // que Android descarte el tipo personalizado y use uno del sistema.
+  // Sin fontWeight: Tahoe Display es un solo peso — combinarlo con fontWeight
+  // hace que Android descarte el tipo personalizado y use uno del sistema.
   logo: {
     color: NV.tinta,
     fontFamily: Font.brand,

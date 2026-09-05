@@ -1,7 +1,7 @@
 /**
  * Colores de la app.
  *
- * NutroVia tiene un solo tema: papel cálido con tinta casi negra. No hay modo
+ * Vytal tiene un solo tema: papel cálido con tinta casi negra. No hay modo
  * oscuro — la identidad no lo contempla. Los dos objetos `light` y `dark` se
  * mantienen con los MISMOS valores para no tocar `useTheme()` ni ninguna de
  * las llamadas que ya existen: si el sistema del usuario está en oscuro, la
