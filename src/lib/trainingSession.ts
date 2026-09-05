@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import { api } from './api';
+
 /**
  * Progreso guardado de una sesión de entreno para un día concreto del plan.
  * Se persiste en el dispositivo (no en el backend): es un cronómetro y una
@@ -97,4 +99,16 @@ export async function saveTrainingSession(state: TrainingSessionState): Promise<
   } catch {
     // guardado best-effort: si falla, la sesión sigue funcionando en memoria
   }
+}
+
+/**
+ * Sube la duración real de la sesión de hoy al backend, para que el
+ * dashboard web la muestre en "Sesión de hoy" en vez de la estimación del
+ * plan. Upsert por día: se puede llamar más de una vez sin duplicar filas.
+ */
+export async function submitTrainingDuration(durationMin: number): Promise<void> {
+  await api('/api/training/session', {
+    method: 'POST',
+    body: { duration_min: durationMin },
+  });
 }

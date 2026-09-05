@@ -11,6 +11,7 @@ import {
   parseExercise,
   restSecondsFor,
   saveTrainingSession,
+  submitTrainingDuration,
 } from '@/lib/trainingSession';
 import { Spacing } from '@/constants/theme';
 import { Border, Font, NV, Radius } from '@/constants/nutrovia';
@@ -89,6 +90,9 @@ export default function TrainingScreen() {
   const exercisesRef = useRef(exercises);
   exercisesRef.current = exercises;
 
+  // Evita subir la duración más de una vez por sesión completada.
+  const syncedRef = useRef(false);
+
   // Al cambiar de día (o de plan), recupera el progreso guardado de ese día
   // si sigue siendo válido, o arranca en blanco. Siempre en pausa: reabrir
   // la app o volver a la pestaña no reanuda el cronómetro solo.
@@ -99,12 +103,24 @@ export default function TrainingScreen() {
     (async () => {
       const saved = await loadTrainingSession(selectedDay);
       if (cancelled) return;
+      syncedRef.current = false;
       setSession(saved && saved.planGeneratedAt === plan.generated_at ? saved : null);
     })();
     return () => {
       cancelled = true;
     };
   }, [selectedDay, plan?.generated_at]);
+
+  // Al completar todos los ejercicios de la sesión de HOY, sube la duración
+  // real al backend para que el dashboard web la muestre en "Sesión de hoy".
+  useEffect(() => {
+    if (!session || !exercises.length) return;
+    if (session.exerciseIndex < exercises.length) return;
+    if (syncedRef.current) return;
+    if (selectedDay !== todayDayLabel()) return;
+    syncedRef.current = true;
+    submitTrainingDuration(Math.max(1, Math.round(session.elapsed / 60))).catch(() => {});
+  }, [session, exercises.length, selectedDay]);
 
   // Cronómetro + cuenta atrás del descanso: un único intervalo mientras corre.
   useEffect(() => {
@@ -186,7 +202,7 @@ export default function TrainingScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         {/* Cabecera de la sesión seleccionada */}
         <View style={[styles.section, styles.headSection]}>
